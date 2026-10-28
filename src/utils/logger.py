@@ -25,6 +25,7 @@ def _get_logger(name="src_logger", level=logging.INFO):
     # 2. 文件 Handler（路径来自 config.config.LOG_PATH）
     log_path = LOG_PATH
     log_dir = os.path.dirname(log_path)
+    print(f"[Info] 日志文件路径: {log_path}")
     if log_dir:
         os.makedirs(log_dir, exist_ok=True)
 

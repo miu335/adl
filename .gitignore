@@ -7,7 +7,7 @@ venv/
 .pytest_cache/
 
 # 数据与产物：不纳入版本控制
-data/raw/*.csv
+data/
 outputs/
 
 # 本地环境

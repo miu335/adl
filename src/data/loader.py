@@ -34,8 +34,7 @@ def load_sim_csv(path):
     文件特点：
       - 每列用分号 ';' 分隔
       - 第一行为表头，第二行起为数据
-
-    返回: pandas.DataFrame，列名为 CSV_COLUMNS
+      - 列名为 CSV_COLUMNS
     """
     if not path or not os.path.exists(path):
         logger.error(f"仿真数据文件不存在: {path}")

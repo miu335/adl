@@ -77,5 +77,6 @@ class Config:
 cfg = Config()
 
 # 常用配置
-LOG_PATH = cfg.get("log_path")
-SIM_PATH = cfg.get("sim_path")
+LOG_PATH = (PROJECT_ROOT / str(cfg.get("log_path"))).resolve() 
+SIM_PATH = (PROJECT_ROOT / str(cfg.get("sim_path"))).resolve() 
+PROCESSED_DIR = (PROJECT_ROOT / str(cfg.get("processed_dir"))).resolve()
