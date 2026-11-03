@@ -1,3 +1,7 @@
 {
-    "loss": 0.002
+    "loss": 0.002,
+    "val_ratio": 0.15,
+    "test_ratio": 0.15,
+    "target_number": 1,
+    "SEED": 42
 }

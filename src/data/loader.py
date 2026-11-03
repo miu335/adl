@@ -1,79 +1,51 @@
 # src/data/loader.py
-"""仿真结果 CSV 读取与列名规范化。"""
+# 仿真结果 CSV 读取，按 target_number 划分特征/目标。
 
-import os
 import pandas as pd
 
+from src.config import TARGET_NUMBER
 from src.utils.logger import logger
 
-# CSV 列名（分号分隔）注意重新命名
-CSV_COLUMNS = [
-    "width_substrate_mm",
-    "width_impedance_line_mm",
-    "length_impedance_line_mm",
-    "substrate_height_mm",
-    "patch_height_mm",
-    "width_slot_mm",
-    "length_slot_mm",
-    "patch_width_mm",
-    "substrate_length_mm",
-    "patch_length_mm",
-    "frequency_ghz",
-    "s11_db",
-]
-
-# 输入特征列 / 目标列
-FEATURE_COLS = CSV_COLUMNS[:-1]   # 前 11 列为特征
-TARGET_COLS = ["s11_db"]          # 最后一列为目标
-
-
 def load_sim_csv(path):
-    """
-    读取天线仿真结果 CSV。
-
-    文件特点：
-      - 每列用分号 ';' 分隔
-      - 第一行为表头，第二行起为数据
-      - 列名为 CSV_COLUMNS
-    """
-    if not path or not os.path.exists(path):
-        logger.error(f"仿真数据文件不存在: {path}")
-        raise FileNotFoundError(f"仿真数据文件不存在: {path}")
-
+    # 读取天线仿真结果 CSV
     logger.info(f"读取仿真数据: {path}")
 
-    df = pd.read_csv(
-        path,
-        sep=";",
-        header=0,          
-        engine="python",   
-    )
+    try:
+        df = pd.read_csv(path, sep=";", header=0, engine="python")
+        logger.info(f"成功读取数据集！当前数据维度: {df.shape} ")
+    except FileNotFoundError:
+        logger.error(f"未找到数据集文件: {path}")
+        raise FileNotFoundError
 
-    # 校验列数
-    if df.shape[1] != len(CSV_COLUMNS):
-        logger.error(
-            f"列数不匹配: 期望 {len(CSV_COLUMNS)}，实际 {df.shape[1]}，"
-            f"原始列名={list(df.columns)}"
-        )
-        raise ValueError(
-            f"CSV 列数不匹配: 期望 {len(CSV_COLUMNS)}，实际 {df.shape[1]}"
-        )
-
-    df.columns = CSV_COLUMNS
-
-    # 数值转换，非法值变 NaN
-    for col in CSV_COLUMNS:
+    for col in df.columns:
         df[col] = pd.to_numeric(df[col], errors="coerce")
 
-    # 去掉全空行
     df = df.dropna(how="all").reset_index(drop=True)
 
-    logger.info(f"读取完成: {df.shape[0]} 行 × {df.shape[1]} 列")
+    logger.info(
+        f"读取完成: {df.shape[0]} 行 × {df.shape[1]} 列，"
+        f"列名: {list(df.columns)}"
+    )
     return df
 
 
-def split_features_target(df):
-    """拆分特征 X 与目标 y。"""
-    X = df[FEATURE_COLS].copy()
-    y = df[TARGET_COLS].copy()
-    return X, y
+def split_features_target(df, target_number=None):
+    """
+    按 target_number 划分：最后 N 列为目标，其余为特征
+    返回: (X, y) 两个 DataFrame，保留原始列名
+    """
+    if target_number is None:
+        target_number = TARGET_NUMBER
+
+    n_cols = df.shape[1]
+
+    feature_cols = list(df.columns[: n_cols - target_number])
+    target_cols = list(df.columns[n_cols - target_number:])
+
+    logger.info(
+        f"划分: target_number={target_number}, "
+        f"特征({len(feature_cols)})={feature_cols}, "
+        f"目标({len(target_cols)})={target_cols}"
+    )
+
+    return df[feature_cols].copy(), df[target_cols].copy()
