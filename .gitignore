@@ -13,3 +13,4 @@ outputs/
 # 本地环境
 .env
 .DS_Store
+.vscode/settings.json
