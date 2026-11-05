@@ -2,5 +2,6 @@
     "log_path": "outputs/logs/res.txt",
     "sim_path": "data/raw/DataSet.csv",
     "processed_dir": "data/raw/processed",
-    "model_dir": "outputs/models"
+    "model_dir": "outputs/models",
+    "fig_dir": "outputs/figures"
 }

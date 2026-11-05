@@ -7,7 +7,7 @@ import torch
 
 from src.config import MODEL_NAME, EPOCHS, MODEL_DIR, PATIENCE
 from src.data.dataset import get_loaders
-from src.models.base import build_model 
+from src.models.base import build_model, save_model
 from src.train.loss import build_loss
 from src.train.optimizer import build_optimizer, build_scheduler
 from src.utils.logger import logger
@@ -50,7 +50,7 @@ def validate(model, loader, loss_fn, device):
     return total_loss / max(n_samples, 1)
 
 
-def run_train():
+def run_train(model_name="proxy"):
     """
     完整训练流程:
       get_loaders -> build_model -> build_loss/optimizer/scheduler
@@ -59,7 +59,7 @@ def run_train():
     logger.info("===== 开始训练流程 =====")
 
     # 1. 数据
-    train_loader, val_loader, test_loader, data = get_loaders()
+    train_loader, val_loader, _, data = get_loaders(model_name)
 
     # 2. 设备
     device = "cpu"
@@ -78,7 +78,7 @@ def run_train():
 
     # 5. 训练循环
     os.makedirs(MODEL_DIR, exist_ok=True)
-    best_path = os.path.join(MODEL_DIR, "best.pt")
+    best_path = os.path.join(MODEL_DIR, f"{model_name}.pt")
     best_val_loss = float("inf")
     wait = 0
 
@@ -98,8 +98,8 @@ def run_train():
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             wait = 0
-            torch.save(model.state_dict(), best_path)
-            logger.info(f"保存 best.pt (val_loss={val_loss:.6f})")
+            logger.info(f"val loss 改善: {best_val_loss:.6f}")
+            save_model(model_name, model.state_dict(), best_path)
         else:
             wait += 1
 

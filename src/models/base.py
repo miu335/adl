@@ -1,6 +1,7 @@
 # src/models/base.py
 """模型注册表：按名称注册与构建模型。"""
 from typing import Dict, Type
+import torch
 import torch.nn as nn
 
 from src.utils.logger import logger
@@ -44,3 +45,15 @@ def build_model(name, **kwargs):
     n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     logger.info(f"构建模型: {name} ({cls.__name__}), 可训练参数={n_params}")
     return model
+
+_MODEL_PATH_CACHE: Dict[str, str] = {}
+
+def get_model_path(model_name=None):
+    return _MODEL_PATH_CACHE.get(model_name, None)   
+
+
+def save_model(model_name, model, path=None):
+    torch.save(model.state_dict(), path)
+    _MODEL_PATH_CACHE[model_name] = path
+    logger.info(f"{model_name}模型权重已保存: {path}")
+

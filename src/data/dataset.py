@@ -9,6 +9,7 @@ from src.data.loader import load_sim_csv
 from src.data.preprocess import run_preprocess
 from src.utils.logger import logger
 
+_LOADER_CACHE: dict = {}
 
 def _make_loader(X, y, batch_size, shuffle, name):
     """构造单个 DataLoader。"""
@@ -28,11 +29,16 @@ def _make_loader(X, y, batch_size, shuffle, name):
     return loader
 
 
-def get_loaders(path=None, batch_size=None):
+def get_loaders(model_name="proxy", path=None, batch_size=None):
     """
     从 CSV 生成 train/val/test 三个 DataLoader。
     load_sim_csv -> run_preprocess -> 构造 DataLoader。
     """
+    cached = _LOADER_CACHE.get(model_name)
+    if cached is not None:
+        logger.info(f"使用缓存的 DataLoader: {model_name}")
+        return cached
+    
     path = path or SIM_PATH
     if batch_size is None:
         batch_size = BATCH_SIZE
@@ -56,8 +62,10 @@ def get_loaders(path=None, batch_size=None):
         data.X_test, data.y_test, batch_size, shuffle=False, name="test"
     )
 
+    _LOADER_CACHE[model_name] = (train_loader, val_loader, test_loader, data)
+
     logger.info(
         f"DataLoader 构建完成: train={len(train_loader.dataset)}, "
         f"val={len(val_loader.dataset)}, test={len(test_loader.dataset)}"
     )
-    return train_loader, val_loader, test_loader, data
+    return (train_loader, val_loader, test_loader, data)
