@@ -1,5 +1,6 @@
 {
     "log_path": "outputs/logs/res.txt",
     "sim_path": "data/raw/DataSet.csv",
-    "processed_dir": "data/raw/processed"
+    "processed_dir": "data/raw/processed",
+    "model_dir": "outputs/models"
 }

@@ -60,4 +60,4 @@ def get_loaders(path=None, batch_size=None):
         f"DataLoader 构建完成: train={len(train_loader.dataset)}, "
         f"val={len(val_loader.dataset)}, test={len(test_loader.dataset)}"
     )
-    return train_loader, val_loader, test_loader
+    return train_loader, val_loader, test_loader, data

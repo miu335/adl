@@ -64,7 +64,7 @@ class TestGetLoaders(unittest.TestCase):
         cls.csv_path = os.path.join(sim_dir, "test_dataset_sim.csv")
         _write_test_csv(cls.csv_path)
 
-        cls.train_loader, cls.val_loader, cls.test_loader = get_loaders(
+        cls.train_loader, cls.val_loader, cls.test_loader, _ = get_loaders(
         path=cls.csv_path)
 
         sample_x, sample_y = cls.train_loader.dataset[0]

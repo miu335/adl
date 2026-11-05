@@ -18,6 +18,7 @@ def register_model(name):
         class MLP(nn.Module):
             ...
     """
+    name = name.lower()
     def decorator(cls):
         if not issubclass(cls, nn.Module):
             raise TypeError(f"注册的模型必须是 nn.Module 子类: {cls}")
@@ -33,6 +34,7 @@ def build_model(name, **kwargs):
     """
     按名称构建模型。
     """
+    name = name.lower()
     if name not in MODEL_REGISTRY:
         raise ValueError(
             f"未注册的模型: {name}，可用模型: {sorted(MODEL_REGISTRY)}"
