@@ -91,6 +91,6 @@ LOSS = str(cfg.get("loss", "mse")).lower()
 LR = float(cfg.get("lr", 1e-3))
 WEIGHT_DECAY = float(cfg.get("weight_decay", 1e-4))
 EPOCHS = int(cfg.get("epochs", 200))
-MODEL_NAME = str(cfg.get("model_name", "MLP")).lower()
+MODEL_TYPE = str(cfg.get("model_type", "MLP")).lower()
 PATIENCE = int(cfg.get("patience", 20)) #早停 
 FIG_DIR = (PROJECT_ROOT / str(cfg.get("fig_dir"))).resolve()

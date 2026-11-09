@@ -31,19 +31,19 @@ def register_model(name):
     return decorator
 
 
-def build_model(name, **kwargs):
+def build_model(model_type, **kwargs):
     """
     按名称构建模型。
     """
-    name = name.lower()
-    if name not in MODEL_REGISTRY:
+    model_type = model_type.lower()
+    if model_type not in MODEL_REGISTRY:
         raise ValueError(
-            f"未注册的模型: {name}，可用模型: {sorted(MODEL_REGISTRY)}"
+            f"未注册的模型: {model_type}，可用模型: {sorted(MODEL_REGISTRY)}"
         )
-    cls = MODEL_REGISTRY[name]
+    cls = MODEL_REGISTRY[model_type]
     model = cls(**kwargs)
     n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    logger.info(f"构建模型: {name} ({cls.__name__}), 可训练参数={n_params}")
+    logger.info(f"构建模型: {model_type} ({cls.__name__}), 可训练参数={n_params}")
     return model
 
 _MODEL_PATH_CACHE: Dict[str, str] = {}

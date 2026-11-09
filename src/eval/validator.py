@@ -1,5 +1,5 @@
 # src/eval/validator.py
-"""评估入口：加载 best.pt，test 上算指标（反变换回 dB），出图。"""
+"""评估入口：加载 model_name.pt，test 上算指标（反变换回 dB），出图。"""
 
 import json
 import os
@@ -10,7 +10,7 @@ import torch
 
 plt.ioff()  
 
-from src.config import MODEL_NAME, FIG_DIR, MODEL_DIR
+from src.config import MODEL_TYPE, FIG_DIR, MODEL_DIR
 
 from src.data.dataset import get_loaders
 from src.eval.metrics import compute_all
@@ -94,7 +94,7 @@ def run_evaluate(model_name="proxy"):
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
     model = build_model(
-        MODEL_NAME,
+        MODEL_TYPE,
         in_dim=len(data.feature_names),
         out_dim=len(data.target_names)
     ).to(device)
