@@ -1,118 +1,195 @@
 # src/train/trainer.py
-"""训练入口：数据准备 -> 模型/损失/优化器 -> 训练循环 -> 早停 -> 保存 best.pt。"""
+"""训练器：__init__ 内部生成全部组件，fit 执行训练循环。"""
 
-import os
+import time,os
+from typing import Any
 
 import torch
+import torch.nn as nn
+from torch.optim import Optimizer
+from torch.optim.lr_scheduler import LRScheduler
+from torch.utils.data import DataLoader
 
-from src.config import MODEL_TYPE, EPOCHS, MODEL_DIR, PATIENCE
+from src.config import (
+    EPOCHS, PATIENCE, MODEL_DIR, MODEL_TYPE,
+)
+from src.models.base import build_model 
 from src.data.dataset import get_loaders
-from src.models.base import build_model, save_model
 from src.train.loss import build_loss
 from src.train.optimizer import build_optimizer, build_scheduler
 from src.utils.logger import logger
 
-def train_one_epoch(model, loader, loss_fn, optimizer, device):
-    """训练一个 epoch，返回平均 loss。"""
-    model.train()
-    total_loss = 0.0
-    n_samples = 0
 
-    for X, y in loader:
-        X, y = X.to(device), y.to(device)
+def _get_device() -> torch.device:
+    return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        optimizer.zero_grad()
-        pred = model(X)
-        loss = loss_fn(pred, y)
-        loss.backward()
-        optimizer.step()
-
-        total_loss += loss.item() * len(X)
-        n_samples += len(X)
-
-    return total_loss / max(n_samples, 1)
-
-
-@torch.no_grad()
-def validate(model, loader, loss_fn, device):
-    """验证一个 epoch，返回平均 loss。"""
-    model.eval()
-    total_loss = 0.0
-    n_samples = 0
-
-    for X, y in loader:
-        X, y = X.to(device), y.to(device)
-        pred = model(X)
-        loss = loss_fn(pred, y)
-        total_loss += loss.item() * len(X)
-        n_samples += len(X)
-
-    return total_loss / max(n_samples, 1)
-
-
-def run_train(model_name="proxy",model_type=MODEL_TYPE):
+class Trainer:
     """
-    完整训练流程:
-      get_loaders -> build_model -> build_loss/optimizer/scheduler
-      -> 训练循环 -> 按 val loss 保存 model_name.pt -> 早停
+    训练器：数据准备 -> 模型/损失/优化器 -> 训练循环 -> 早停 -> 保存 pt
+
+    用法:
+        Trainer((0,-1),(-1,None),"proxy").fit()
     """
-    logger.info("===== 开始训练流程 =====")
+    model_name: str
+    device: torch.device
+    epochs: int
+    patience: int
+    train_loader: DataLoader
+    val_loader: DataLoader
+    test_loader: DataLoader 
+    data: Any
+    model_type: str
+    model: nn.Module
+    loss_fn : Any
+    optimizer: Optimizer
+    scheduler: LRScheduler
+    meta: dict[str, Any]
 
-    # 1. 数据
-    train_loader, val_loader, _, data = get_loaders(model_name)
+    def __init__(
+        self,
+        feat : tuple ,
+        tgt: tuple ,
+        model_name : str = f"{time.time():.2f}",
+    ) -> None:
+        self.model_name = model_name
+        self.device =_get_device()
+        self.epochs = EPOCHS
+        self.patience = PATIENCE
+        self.model_path = os.path.join(MODEL_DIR, f"{model_name}.pt")
 
-    # 2. 设备
-    device = "cpu"
-
-    # 3. 模型
-    model = build_model(
-        model_type,
-        in_dim=len(data.feature_names),
-        out_dim=len(data.target_names)
-    ).to(device)
-
-    # 4. 损失 / 优化器 / 调度器
-    loss_fn = build_loss()
-    optimizer = build_optimizer(model)
-    scheduler = build_scheduler(optimizer)
-
-    # 5. 训练循环
-    os.makedirs(MODEL_DIR, exist_ok=True)
-    best_path = os.path.join(MODEL_DIR, f"{model_name}.pt")
-    best_val_loss = float("inf")
-    wait = 0
-
-    for epoch in range(1, EPOCHS + 1):
-        train_loss = train_one_epoch(
-            model, train_loader, loss_fn, optimizer, device
+        # 1. 数据
+        self.train_loader, self.val_loader, self.test_loader, self.data = get_loaders(
+            feature_pos = feat, target_pos = tgt
         )
-        val_loss = validate(model, val_loader, loss_fn, device)
+        # 2. 模型
+        self.model_type = MODEL_TYPE
+        self.model = build_model(
+            self.model_type,
+            in_dim=len(self.data.feature_names),
+            out_dim=len(self.data.target_names),
+        ).to(self.device)
 
-        current_lr = optimizer.param_groups[0]["lr"]
+        # 3. 损失 / 优化器 / 调度器
+        self.loss_fn = build_loss()
+        self.optimizer = build_optimizer(self.model)
+        self.scheduler = build_scheduler(self.optimizer)
+
+        # 4. 元信息
+        self.meta = {
+            "feature_names": self.data.feature_names,
+            "target_names": self.data.target_names,
+        }
+
+        # 5. 训练状态
+        self.best_val_loss: float = float("inf")
+        self.best_state: dict[str, torch.Tensor] | None = None
+        self.best_epoch: int = -1
+        self.wait: int = 0
+        self.history: list[dict[str, Any]] = []
+
         logger.info(
-            f"Epoch {epoch}/{EPOCHS} | train_loss={train_loss:.6f} | "
-            f"val_loss={val_loss:.6f} | lr={current_lr:.2e}"
+            f"训练器初始化完成: model_path  = {self.model_path}! "
         )
 
-        # 按 val loss 保存 best
-        if val_loss < best_val_loss:
-            best_val_loss = val_loss
-            wait = 0
-            logger.info(f"val loss 改善: {best_val_loss:.6f}")
-            save_model(model_name, model, best_path)
+    # 单 epoch
+    def train_one_epoch(self) -> float:
+        self.model.train()
+        total_loss = 0.0
+        n_samples = 0
+        for X, y in self.train_loader:
+            X, y = X.to(self.device), y.to(self.device)
+            self.optimizer.zero_grad()
+            pred = self.model(X)
+            loss = self.loss_fn(pred, y)
+            loss.backward()
+            self.optimizer.step()
+            total_loss += loss.item() * len(X)
+            n_samples += len(X)
+        return total_loss / max(n_samples, 1)
+
+    @torch.no_grad()
+    def validate(self) -> float:
+        self.model.eval()
+        total_loss = 0.0
+        n_samples = 0
+        for X, y in self.val_loader:
+            X, y = X.to(self.device), y.to(self.device)
+            pred = self.model(X)
+            loss = self.loss_fn(pred, y)
+            total_loss += loss.item() * len(X)
+            n_samples += len(X)
+        return total_loss / max(n_samples, 1)
+
+    # 最优更新 / 保存
+    def _update_best(self, val_loss: float, epoch: int):
+        if val_loss < self.best_val_loss:
+            self.best_val_loss = val_loss
+            self.best_epoch = epoch
+            self.best_state = {
+                k: v.detach().cpu().clone()
+                for k, v in self.model.state_dict().items()
+            }
+            self.wait = 0
+            logger.info(f"更新最优: epoch={epoch}, val_loss={val_loss:.6f}")
         else:
-            wait += 1
+            self.wait += 1
 
-        # 调度器：val loss 不降则降 lr
-        scheduler.step(val_loss)
+    def _save_best(self):
+        if self.best_state is None:
+            logger.error("未产生最优权重，跳过保存")
+            return None
+        self.model.load_state_dict(self.best_state)
+        meta = dict(self.meta)
+        meta.update({
+            "model_name": self.model_name,
+            "best_epoch": self.best_epoch,
+            "best_val_loss": self.best_val_loss,
+        })
+        os.makedirs(os.path.dirname(self.model_path), exist_ok=True)
+        torch.save(self.model.state_dict(), self.model_path)
+        logger.info(f"{self.model_name}模型权重已保存: {self.model_path}")
 
-        # 早停
-        if wait >= PATIENCE:
-            logger.info(f"早停: 连续 {PATIENCE} 个 epoch val loss 未改善")
-            break
+    # ------------------------------------------------------------------ #
+    # 主循环
+    # ------------------------------------------------------------------ #
+    def fit(self) -> str | None:
+        logger.info(f"===== 开始训练: {self.model_name} =====")
+        t_start = time.perf_counter()
 
-    logger.info(
-        f"训练结束: best_val_loss={best_val_loss:.6f}, 权重={best_path}"
-    )
-    logger.info("===== 训练流程结束 =====")
-    return best_path
+        for epoch in range(1, self.epochs + 1):
+            t_epoch = time.perf_counter()
+
+            train_loss = self.train_one_epoch()
+            val_loss = self.validate()
+
+            epoch_time = time.perf_counter() - t_epoch
+            lr = self.optimizer.param_groups[0]["lr"]
+            logger.info(
+                f"Epoch {epoch}/{self.epochs} | train_loss={train_loss:.6f} | "
+                f"val_loss={val_loss:.6f} | lr={lr:.2e} | 耗时={epoch_time:.2f}s"
+            )
+            self.history.append({
+                "epoch": epoch,
+                "train_loss": train_loss,
+                "val_loss": val_loss,
+                "lr": lr,
+                "time": epoch_time,
+            })
+
+            self._update_best(val_loss, epoch)
+
+            if self.scheduler is not None:
+                self.scheduler.step(val_loss)
+
+            if self.wait >= self.patience:
+                logger.info(f"早停: 连续 {self.patience} 个 epoch 未改善")
+                break
+
+        self._save_best()        
+        total_time = time.perf_counter() - t_start
+        logger.info(
+            f"训练结束: best_epoch={self.best_epoch}, "
+            f"best_val_loss={self.best_val_loss:.6f}, "
+            f"总耗时={total_time:.2f}s ({total_time / 60:.2f}min)\n"
+            "===== 训练流程结束 ====="
+        )
