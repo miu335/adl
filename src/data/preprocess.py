@@ -23,16 +23,15 @@ def _make_scaler(name):
     raise ValueError(f"不支持的 scaler: {name}")
 
 
-def run_preprocess(df, target_number=None):
+def run_preprocess(df, feature_pos, target_pos):
    # 对已读入的 DataFrame 做清洗、三分、缩放。
  
-    if target_number is None:
-        target_number = TARGET_NUMBER
 
     logger.info("===== 开始预处理 =====")
 
     # 1. 划分特征/目标
-    X_df, y_df = split_features_target(df, target_number)
+    
+    X_df, y_df = split_features_target(df, feature_pos, target_pos)
     feature_names = list(X_df.columns)
     target_names = list(y_df.columns)
 

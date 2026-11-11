@@ -46,14 +46,5 @@ def build_model(model_type, **kwargs):
     logger.info(f"构建模型: {model_type} ({cls.__name__}), 可训练参数={n_params}")
     return model
 
-_MODEL_PATH_CACHE: Dict[str, str] = {}
-
-def get_model_path(model_name=None):
-    return _MODEL_PATH_CACHE.get(model_name, None)   
-
-
-def save_model(model_name, model, path=None):
-    torch.save(model.state_dict(), path)
-    _MODEL_PATH_CACHE[model_name] = path
-    logger.info(f"{model_name}模型权重已保存: {path}")
+ 
 

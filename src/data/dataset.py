@@ -29,27 +29,21 @@ def _make_loader(X, y, batch_size, shuffle, name):
     return loader
 
 
-def get_loaders(model_name="proxy", path=None, batch_size=None):
+def get_loaders(path=None, batch_size=None, feature_pos: tuple = (0, -1), target_pos: tuple = (-1, None)):
     """
     从 CSV 生成 train/val/test 三个 DataLoader。
     load_sim_csv -> run_preprocess -> 构造 DataLoader。
     """
-    cached = _LOADER_CACHE.get(model_name)
-    if cached is not None:
-        logger.info(f"使用缓存的 DataLoader: {model_name}")
-        return cached
-    
     path = path or SIM_PATH
-    if batch_size is None:
-        batch_size = BATCH_SIZE
+    batch_size = batch_size or BATCH_SIZE
 
     logger.info("===== 构建 DataLoader =====")
 
     # 1. 读 CSV
     df = load_sim_csv(path)
 
-    # 2. 预处理（内存返回数组 + scaler）
-    data = run_preprocess(df)
+    # 2. 预处理（返回数组 + scaler）
+    data = run_preprocess(df, feature_pos, target_pos)
 
     # 3. 构造三个 loader
     train_loader = _make_loader(
@@ -62,10 +56,8 @@ def get_loaders(model_name="proxy", path=None, batch_size=None):
         data.X_test, data.y_test, batch_size, shuffle=False, name="test"
     )
 
-    _LOADER_CACHE[model_name] = (train_loader, val_loader, test_loader, data)
-
     logger.info(
         f"DataLoader 构建完成: train={len(train_loader.dataset)}, "
         f"val={len(val_loader.dataset)}, test={len(test_loader.dataset)}"
     )
-    return (train_loader, val_loader, test_loader, data)
+    return train_loader, val_loader, test_loader, data

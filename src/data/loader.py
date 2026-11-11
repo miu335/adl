@@ -29,21 +29,16 @@ def load_sim_csv(path):
     return df
 
 
-def split_features_target(df, target_number=None):
+def split_features_target(df, feature_pos: tuple, target_pos: tuple):
     """
-    按 target_number 划分：最后 N 列为目标，其余为特征
     返回: (X, y) 两个 DataFrame，保留原始列名
     """
-    if target_number is None:
-        target_number = TARGET_NUMBER
 
-    n_cols = df.shape[1]
-
-    feature_cols = list(df.columns[: n_cols - target_number])
-    target_cols = list(df.columns[n_cols - target_number:])
+    feature_cols = list(df.columns[slice(*feature_pos)])
+    target_cols = list(df.columns[slice(*target_pos)])
 
     logger.info(
-        f"划分: target_number={target_number}, "
+        f"划分: feature_number={len(feature_cols)},target_number={len(target_cols)} "
         f"特征({len(feature_cols)})={feature_cols}, "
         f"目标({len(target_cols)})={target_cols}"
     )

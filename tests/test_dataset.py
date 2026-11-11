@@ -65,7 +65,8 @@ class TestGetLoaders(unittest.TestCase):
         _write_test_csv(cls.csv_path)
 
         cls.train_loader, cls.val_loader, cls.test_loader, _ = get_loaders(
-        path=cls.csv_path)
+        path=cls.csv_path,feature_pos=(0, -1), target_pos=(-1, None)
+        )
 
         sample_x, sample_y = cls.train_loader.dataset[0]
         cls.n_total = len(DATA_LINES)              # 19
