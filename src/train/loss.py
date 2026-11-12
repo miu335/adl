@@ -22,3 +22,9 @@ def build_loss(name=None):
 
     logger.info(f"损失函数: {name} -> {loss_fn.__class__.__name__}")
     return loss_fn
+
+def make_consistency_loss():
+    pass
+
+def add_loss():
+    pass
